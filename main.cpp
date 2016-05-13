@@ -198,12 +198,11 @@ void mouse(int button, int state, int x, int y)
     }
     // Give velocities to objects in the physics world
     else if (mode == MODE_CHANGE_VELOCITY && button == GLUT_LEFT_BUTTON) {
-        if (mouse_state == MOUSE_DEFAULT) {
-            reshape_index = get_circle_for_point(p);
-            if (reshape_index != -1) {
+        if (state == GLUT_DOWN && mouse_state == MOUSE_DEFAULT) {
+            if ((reshape_index = get_circle_for_point(p)) != -1) {
                 mouse_state = MOUSE_DRAWING;
             }
-        } else {
+        } else if (state == GLUT_DOWN && mouse_state == MOUSE_DRAWING) {
             world.bodies[reshape_index].velocity = p - world.bodies[reshape_index].position;
             mouse_state = MOUSE_DEFAULT;
         }
@@ -218,7 +217,6 @@ void mouseMove(int x, int y)
         if (mode == MODE_ADD_OBJECTS && mouse_state == MOUSE_DRAWING) {
             world.bodies[reshape_index].radius = distance(world.bodies[reshape_index].position, p);
         }
-        // TODO give velocity
         else if (mode == MODE_CHANGE_VELOCITY && mouse_state == MOUSE_DRAWING) {
             world.bodies[reshape_index].velocity = p - world.bodies[reshape_index].position;
         }
@@ -254,8 +252,6 @@ void mode_sub(int value)
     if (value == 0)
         mode = MODE_ADD_OBJECTS;
     else if (value == 1)
-        mode = MODE_RESHAPE;
-    else if (value == 2)
         mode = MODE_CHANGE_VELOCITY;
     glutPostRedisplay();
 }
@@ -270,8 +266,7 @@ void make_menu(void)
 { 
     int mode_menu = glutCreateMenu(mode_sub);
     glutAddMenuEntry("Add Bodies", 0);
-    glutAddMenuEntry("Reshape", 1);
-    glutAddMenuEntry("Change Velocity", 2);
+    glutAddMenuEntry("Change Velocity", 1);
 
     /*MainMenu*/
     glutCreateMenu(menu);
