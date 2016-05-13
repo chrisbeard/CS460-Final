@@ -52,16 +52,22 @@ public:
         x = y = 0;
     }
     Point &operator +=(const Point &p) {
-        x = x + p.x;
-        y = y + p.y;
+        x += p.x;
+        y += p.y;
         return *this;
     }
     Point &operator +=(const Vector &v) {
-        x = x + v.x;
-        y = y + v.y;
+        x += v.x;
+        y += v.y;
+        return *this;
+    }
+    Point operator +(const Vector &v) {
+        x += v.x;
+        y += v.y;
         return *this;
     }
 };
+// Point operators
 Point operator*(Point p, double d) {
     return Point(p.x * d, p.y * d);
 }
@@ -71,6 +77,8 @@ Point operator*(double d, Point p) {
 double distance(const Point &p1, const Point &p2) {
     return sqrt(pow(p1.x - p2.x, 2) + pow(p1.y - p2.y, 2));
 }
+
+// Vector operators
 Vector operator*(const Vector &v, double d) {
     return Vector(v.x * d, v.y * d);
 }
@@ -171,7 +179,33 @@ void update_bodies()
     if (mode != MODE_MOVE)
         return;
     for (size_t i = 0; i < world.bodies.size(); ++i) {
-        world.bodies[i].position += world.bodies[i].velocity / 60.0;
+        // Check for wall collsions
+        Point old_position = world.bodies[i].position;
+        Vector velocity = world.bodies[i].velocity / 30.0;
+        Point new_position = world.bodies[i].position + velocity;
+        double radius = world.bodies[i].radius;
+
+        // Left wall
+        if (new_position.x - radius < 0) {
+            new_position.x += 1 * -(new_position.x - radius);
+            world.bodies[i].velocity.x *= -1;
+        }
+        // Right wall
+        if (new_position.x + radius > window_width) {
+            new_position.x -= 1 * (new_position.x + radius - window_width);
+            world.bodies[i].velocity.x *= -1;
+        }
+        // Top wall
+        if (new_position.y - radius < 0) {
+            new_position.y += 2 * -(new_position.y - radius);
+            world.bodies[i].velocity.y *= -1;
+        }
+        // Bottom wall
+        if (new_position.y + radius > window_height) {
+            new_position.y -= 2 * (new_position.y + radius - window_height);
+            world.bodies[i].velocity.y *= -1;
+        }
+        world.bodies[i].position = new_position;
     }
 }
 
