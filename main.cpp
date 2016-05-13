@@ -178,8 +178,9 @@ void update_bodies()
 {
     if (mode != MODE_MOVE)
         return;
+
+    // Check for wall collsions
     for (size_t i = 0; i < world.bodies.size(); ++i) {
-        // Check for wall collsions
         Point old_position = world.bodies[i].position;
         Vector velocity = world.bodies[i].velocity / 30.0;
         Point new_position = world.bodies[i].position + velocity;
@@ -206,6 +207,23 @@ void update_bodies()
             world.bodies[i].velocity.y *= -1;
         }
         world.bodies[i].position = new_position;
+    }
+
+    // Check for ball collisions
+    for (size_t i = 0; i < world.bodies.size() - 1; ++i) {
+        for (size_t j = i + 1; j < world.bodies.size(); ++j) {
+            // TODO different collision mechanisms
+            double d = fabs(distance(world.bodies[i].position, world.bodies[j].position));
+            double rad_sum = world.bodies[i].radius + world.bodies[j].radius;
+            if (d < rad_sum) {
+                Vector v1 = world.bodies[i].velocity;
+                Vector v2 = world.bodies[j].velocity;
+                
+                // TODO take mass into account
+                world.bodies[i].velocity = v2;
+                world.bodies[j].velocity = v1;
+            }
+        }
     }
 }
 
