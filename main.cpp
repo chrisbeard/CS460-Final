@@ -8,37 +8,6 @@
 
 // Data Structures
 // ----------------------------------------------------------------------------
-class Point {
-public:
-    double x, y;
-    Point() : x(0), y(0) {}
-    Point(double xIn, double yIn) : x(xIn), y(yIn) {}
-    Point(const Point &p) : x(p.x), y(p.y) {}
-    void display() {
-        glVertex3f((float)x, (float)y, 0);
-    }
-    void print() {
-        std::cout << "(" << x << ", " << y << ")\n";
-    }
-    void reset() {
-        x = y = 0;
-    }
-    Point &operator +=(const Point &p) {
-        x = x + p.x;
-        y = y + p.y;
-        return *this;
-    }
-};
-Point operator*(Point p, double d) {
-    return Point(p.x * d, p.y * d);
-}
-Point operator*(double d, Point p) {
-    return Point(p.x * d, p.y * d);
-}
-double distance(const Point &p1, const Point &p2) {
-    return sqrt(pow(p1.x - p2.x, 2) + pow(p1.y - p2.y, 2));
-}
-
 class Vector {
 public:
     double x, y;
@@ -67,11 +36,52 @@ public:
         y += v.y;
     }
 };
+class Point {
+public:
+    double x, y;
+    Point() : x(0), y(0) {}
+    Point(double xIn, double yIn) : x(xIn), y(yIn) {}
+    Point(const Point &p) : x(p.x), y(p.y) {}
+    void display() {
+        glVertex3f((float)x, (float)y, 0);
+    }
+    void print() {
+        std::cout << "(" << x << ", " << y << ")\n";
+    }
+    void reset() {
+        x = y = 0;
+    }
+    Point &operator +=(const Point &p) {
+        x = x + p.x;
+        y = y + p.y;
+        return *this;
+    }
+    Point &operator +=(const Vector &v) {
+        x = x + v.x;
+        y = y + v.y;
+        return *this;
+    }
+};
+Point operator*(Point p, double d) {
+    return Point(p.x * d, p.y * d);
+}
+Point operator*(double d, Point p) {
+    return Point(p.x * d, p.y * d);
+}
+double distance(const Point &p1, const Point &p2) {
+    return sqrt(pow(p1.x - p2.x, 2) + pow(p1.y - p2.y, 2));
+}
 Vector operator*(const Vector &v, double d) {
     return Vector(v.x * d, v.y * d);
 }
 Vector operator*(double d, const Vector &v) {
     return Vector(v.x * d, v.y * d);
+}
+Vector operator/(const Vector &v, double d) {
+    return Vector(v.x / d, v.y / d);
+}
+Vector operator/(double d, const Vector &v) {
+    return Vector(v.x / d, v.y / d);
 }
 Vector operator+(const Vector &v1, const Vector &v2) {
     return Vector(v1.x + v2.x, v1.y + v2.y);
@@ -128,8 +138,8 @@ static int window_height = 600;
 enum MODE {
     MODE_DEFAULT,
     MODE_ADD_OBJECTS,
-    MODE_RESHAPE,
-    MODE_CHANGE_VELOCITY
+    MODE_CHANGE_VELOCITY,
+    MODE_MOVE
 };
 static int mode = MODE_DEFAULT;
 
@@ -138,7 +148,7 @@ enum MOUSE_STATE {
     MOUSE_DRAWING
 };
 static int mouse_state = MOUSE_DEFAULT;
-    
+
 // Index of cricle currently being modified
 static int reshape_index = -1;
 
@@ -156,11 +166,21 @@ int get_circle_for_point(const Point &p)
 
 // Display functions
 // ----------------------------------------------------------------------------
+void update_bodies()
+{
+    if (mode != MODE_MOVE)
+        return;
+    for (size_t i = 0; i < world.bodies.size(); ++i) {
+        world.bodies[i].position += world.bodies[i].velocity / 60.0;
+    }
+}
+
 void draw_bodies()
 {
     for (size_t i = 0; i < world.bodies.size(); ++i) {
         world.bodies[i].drawCircle();
-        world.bodies[i].drawVelocity();
+        if (mode != MODE_MOVE)
+            world.bodies[i].drawVelocity();
     }
 }
 
@@ -168,10 +188,14 @@ void display(void)
 {
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
+    update_bodies();
     draw_bodies();
 
     glFlush();
     glutSwapBuffers();
+
+    if (mode == MODE_MOVE)
+        glutPostRedisplay();
 }
 
 
@@ -227,7 +251,9 @@ void handleKey(unsigned char key, int x, int y)
 {
     (void)x;
     (void)y;
-    (void)key;
+    if (key == ' ') {
+        mode = (mode != MODE_MOVE) ? MODE_MOVE : MODE_DEFAULT;
+    }
     glutPostRedisplay();
 }
 void specialKey(int key, int x, int y)
@@ -303,7 +329,7 @@ int main(int argc, char** argv)
     glutCreateWindow(argv[0]);
     init();
     glClearColor(0, 0, 0, 1.0);
-	make_menu();
+    make_menu();
 
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
