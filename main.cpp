@@ -3,89 +3,87 @@
 #include <cmath>
 #include <iostream>
 #include <vector>
+#include <stdio.h>
 
 
 // Data Structures
 // ----------------------------------------------------------------------------
 class Point {
 public:
-    double x, y, z;
-    Point() : x(0), y(0), z(0) {}
-    Point(double xIn, double yIn, double zIn) : x(xIn), y(yIn), z(zIn) {}
-    Point(const Point &p) : x(p.x), y(p.y), z(p.z) {}
+    double x, y;
+    Point() : x(0), y(0) {}
+    Point(double xIn, double yIn) : x(xIn), y(yIn) {}
+    Point(const Point &p) : x(p.x), y(p.y) {}
     void display() {
-        glVertex3f((float)x, (float)y, (float)z);
+        glVertex3f((float)x, (float)y, 0);
     }
     void print() {
-        std::cout << "(" << x << ", " << y << ", " << z << ")\n";
+        std::cout << "(" << x << ", " << y << ")\n";
     }
     void reset() {
-        x = y = z = 0;
+        x = y = 0;
     }
     Point &operator +=(const Point &p) {
         x = x + p.x;
         y = y + p.y;
-        z = z + p.z;
         return *this;
     }
 };
 Point operator*(Point p, double d) {
-    return Point(p.x * d, p.y * d, p.z *d);
+    return Point(p.x * d, p.y * d);
 }
 Point operator*(double d, Point p) {
-    return Point(p.x * d, p.y * d, p.z *d);
+    return Point(p.x * d, p.y * d);
 }
-// Point operator+(Point p1, Point p2) {
-//     return Point(p1.x + p2.x, p1.y + p2.y, p1.z + p2.z);
-// }
+double distance(const Point &p1, const Point &p2) {
+    return sqrt(pow(p1.x - p2.x, 2) + pow(p1.y - p2.y, 2));
+}
 
 class Vector {
 public:
-    double x, y, z;
-    Vector() : x(0), y(0), z(0) {}
-    Vector(double xIn, double yIn, double zIn) : x(xIn), y(yIn), z(zIn) {}
-    Vector(const Vector &v) : x(v.x), y(v.y), z (v.z) {}
+    double x, y;
+    Vector() : x(0), y(0) {}
+    Vector(double xIn, double yIn) : x(xIn), y(yIn) {}
+    Vector(const Vector &v) : x(v.x), y(v.y) {}
     double length() {
-        return sqrt(x*x + y*y + z*z);
+        return sqrt(x*x + y*y);
     }
     Vector abs() {
-        return Vector(fabs(x), fabs(y), fabs(z));
+        return Vector(fabs(x), fabs(y));
     }
     double dot_product(const Vector &v) {
-        return (x * v.x) + (y * v.y) + (z * v.z);
+        return (x * v.x) + (y * v.y);
     }
     void normalize() {
-        double length = sqrt(x*x + y*y + z*z);
+        double length = sqrt(x*x + y*y);
         x /= length;
         y /= length;
-        z /= length;
     }
     void print() {
-        std::cout << "vec (" << x << ", " << y << ", " << z << ")\n";
+        std::cout << "vec (" << x << ", " << y << ")\n";
     }
     void add(const Vector &v) {
         x += v.x;
         y += v.y;
-        z += v.z;
     }
 };
 Vector operator*(const Vector &v, double d) {
-    return Vector(v.x * d, v.y * d, v.z * d);
+    return Vector(v.x * d, v.y * d);
 }
 Vector operator*(double d, const Vector &v) {
-    return Vector(v.x * d, v.y * d, v.z *d);
+    return Vector(v.x * d, v.y * d);
 }
 Vector operator+(const Vector &v1, const Vector &v2) {
-    return Vector(v1.x + v2.x, v1.y + v2.y, v1.z + v2.z);
+    return Vector(v1.x + v2.x, v1.y + v2.y);
 }
 Vector operator-(const Vector &v1, const Vector &v2) {
-    return Vector(v1.x - v2.x, v1.y - v2.y, v1.z - v2.z);
+    return Vector(v1.x - v2.x, v1.y - v2.y);
 }
 Vector operator+(Point p1, Point p2) {
-    return Vector(p1.x + p2.x, p1.y + p2.y, p1.z + p2.z);
+    return Vector(p1.x + p2.x, p1.y + p2.y);
 }
 Vector operator-(Point p1, Point p2) {
-    return Vector(p1.x - p2.x, p1.y - p2.y, p1.z - p2.z);
+    return Vector(p1.x - p2.x, p1.y - p2.y);
 }
 
 
@@ -94,16 +92,25 @@ public:
     Point position;
     Vector velocity;
     double mass;
-    double size;
+    double radius;
 
-    PhysicsBody() : position(), velocity(), mass(0), size(0) {}
+    PhysicsBody() : position(), velocity(), mass(0), radius(0) {}
+    PhysicsBody(double xIn, double yIn) : position(xIn, yIn), velocity(), mass(0), radius(0) {}
 
     void drawCircle() {
+        glLineWidth(2.0);
         glBegin(GL_LINE_LOOP);
-        for (unsigned i = 0; i < 360; i++) {
-            float degInRad = i * 180.0 / M_PI;
-            glVertex2f(cos(degInRad)*size, sin(degInRad)*size);
+        for (unsigned i = 0; i < 360; ++i) {
+            double degInRad = i * M_PI / 180.0;
+            glVertex2f(position.x + cos(degInRad)*radius, position.y + sin(degInRad)*radius);
         }
+        glEnd();
+    }
+    void drawVelocity() {
+        glLineWidth(2.0);
+        glBegin(GL_LINES);
+        glVertex2f(position.x, position.y);
+        glVertex2f(position.x + velocity.x, position.y + velocity.y);
         glEnd();
     }
 };
@@ -126,16 +133,42 @@ enum MODE {
 };
 static int mode = MODE_DEFAULT;
 
+enum MOUSE_STATE {
+    MOUSE_DEFAULT,
+    MOUSE_DRAWING
+};
+static int mouse_state = MOUSE_DEFAULT;
+    
+// Index of cricle currently being modified
 static int reshape_index = -1;
 
+PhysicsWorld world;
+
+
+int get_circle_for_point(const Point &p)
+{
+    for (size_t i = 0; i < world.bodies.size(); ++i) {
+        if (distance(p, world.bodies[i].position) < world.bodies[i].radius)
+            return i;
+    }
+    return -1;
+}
+
+// Display functions
+// ----------------------------------------------------------------------------
+void draw_bodies()
+{
+    for (size_t i = 0; i < world.bodies.size(); ++i) {
+        world.bodies[i].drawCircle();
+        world.bodies[i].drawVelocity();
+    }
+}
 
 void display(void)
 {
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-    // glMatrixMode(GL_MODELVIEW);
-    // glLoadIdentity();
-    // glTranslatef(window_width / 2, window_height / 2, 0);
+    draw_bodies();
 
     glFlush();
     glutSwapBuffers();
@@ -146,25 +179,51 @@ void display(void)
 // ----------------------------------------------------------------------------
 void mouse(int button, int state, int x, int y)
 {
-    (void)button;
-    (void)state;
-    (void)x;
-    (void)y;
+    Point p(x, y);
+    // Add objects to the physics world
     if (mode == MODE_ADD_OBJECTS && button == GLUT_LEFT_BUTTON) {
-        std::cout << "Adding object\n";
-        // TODO if inside object, set reshape_index
-        // TODO begin/end adding object
+        if (state == GLUT_DOWN && mouse_state == MOUSE_DEFAULT) {
+            if ((reshape_index = get_circle_for_point(p)) == -1) {
+                world.bodies.push_back(PhysicsBody(x, y));
+                reshape_index = world.bodies.size() - 1;
+                mouse_state = MOUSE_DRAWING;
+            } else {
+                mouse_state = MOUSE_DRAWING;
+            }
+        } else if (state == GLUT_DOWN && mouse_state == MOUSE_DRAWING) {
+            world.bodies[reshape_index].radius = distance(world.bodies[reshape_index].position, p);
+            reshape_index = -1;
+            mouse_state = MOUSE_DEFAULT;
+        }
     }
-    // TODO select object to give velocity to
+    // Give velocities to objects in the physics world
+    else if (mode == MODE_CHANGE_VELOCITY && button == GLUT_LEFT_BUTTON) {
+        if (mouse_state == MOUSE_DEFAULT) {
+            reshape_index = get_circle_for_point(p);
+            if (reshape_index != -1) {
+                mouse_state = MOUSE_DRAWING;
+            }
+        } else {
+            world.bodies[reshape_index].velocity = p - world.bodies[reshape_index].position;
+            mouse_state = MOUSE_DEFAULT;
+        }
+    }
+    
+    glutPostRedisplay();
 }
 void mouseMove(int x, int y)
 {
-    (void)x;
-    (void)y;
+    Point p(x, y);
     if (reshape_index != -1) {
-        // TODO reshape object
+        if (mode == MODE_ADD_OBJECTS && mouse_state == MOUSE_DRAWING) {
+            world.bodies[reshape_index].radius = distance(world.bodies[reshape_index].position, p);
+        }
         // TODO give velocity
+        else if (mode == MODE_CHANGE_VELOCITY && mouse_state == MOUSE_DRAWING) {
+            world.bodies[reshape_index].velocity = p - world.bodies[reshape_index].position;
+        }
     }
+    glutPostRedisplay();
 }
 void handleKey(unsigned char key, int x, int y)
 {
@@ -227,7 +286,7 @@ void init(void)
 {
     glMatrixMode(GL_PROJECTION);
     glLoadIdentity();
-    glOrtho(0.0, window_width, 0.0, window_height, -1000.0, 1000.0);
+    glOrtho(0.0, window_width, window_height, 0.0, -1000.0, 1000.0);
     glMatrixMode(GL_MODELVIEW);
     glLoadIdentity();
 }
@@ -250,6 +309,10 @@ int main(int argc, char** argv)
     init();
     glClearColor(0, 0, 0, 1.0);
 	make_menu();
+
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    glEnable(GL_LINE_SMOOTH);
 
     glutReshapeFunc(reshape);
     glutMouseFunc(mouse);
