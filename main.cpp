@@ -99,12 +99,12 @@ public:
     PhysicsBody() : position(), velocity(), mass(0), size(0) {}
 
     void drawCircle() {
-       glBegin(GL_LINE_LOOP);
-       for (unsigned i = 0; i < 360; i++) {
-          float degInRad = i * 180.0 / M_PI;
-          glVertex2f(cos(degInRad)*size, sin(degInRad)*size);
-       }
-       glEnd();
+        glBegin(GL_LINE_LOOP);
+        for (unsigned i = 0; i < 360; i++) {
+            float degInRad = i * 180.0 / M_PI;
+            glVertex2f(cos(degInRad)*size, sin(degInRad)*size);
+        }
+        glEnd();
     }
 };
 
@@ -120,7 +120,9 @@ static int window_height = 600;
 
 enum MODE {
     MODE_DEFAULT,
-    MODE_ADD_OBJECTS
+    MODE_ADD_OBJECTS,
+    MODE_RESHAPE,
+    MODE_CHANGE_VELOCITY
 };
 static int mode = MODE_DEFAULT;
 
@@ -192,6 +194,10 @@ void mode_sub(int value)
 {
     if (value == 0)
         mode = MODE_ADD_OBJECTS;
+    else if (value == 1)
+        mode = MODE_RESHAPE;
+    else if (value == 2)
+        mode = MODE_CHANGE_VELOCITY;
     glutPostRedisplay();
 }
 void menu(int value)
@@ -205,6 +211,8 @@ void make_menu(void)
 { 
     int mode_menu = glutCreateMenu(mode_sub);
     glutAddMenuEntry("Add Bodies", 0);
+    glutAddMenuEntry("Reshape", 1);
+    glutAddMenuEntry("Change Velocity", 2);
 
     /*MainMenu*/
     glutCreateMenu(menu);
