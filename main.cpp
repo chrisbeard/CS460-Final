@@ -6,6 +6,31 @@
 #include <stdio.h>
 
 
+// Globals and Constants
+// ----------------------------------------------------------------------------
+static int window_width = 900;
+static int window_height = 600;
+
+enum MODE {
+    MODE_DEFAULT,
+    MODE_ADD_OBJECTS,
+    MODE_CHANGE_VELOCITY,
+    MODE_MOVE
+};
+static int mode = MODE_DEFAULT;
+
+static bool friendly_fire = false;
+static int mask = 1;
+
+enum MOUSE_STATE {
+    MOUSE_DEFAULT,
+    MOUSE_DRAWING
+};
+static int mouse_state = MOUSE_DEFAULT;
+
+// Index of cricle currently being modified
+static int reshape_index = -1;
+
 // Data Structures
 // ----------------------------------------------------------------------------
 class Vector {
@@ -119,10 +144,12 @@ public:
     void drawCircle() {
         glLineWidth(2.0);
         glBegin(GL_LINE_LOOP);
-        if (mask == 1)
+        if (!friendly_fire)
+            glColor3f(1.0, 1.0, 1.0); 
+        else if (mask == 1)
             glColor3f(1.0, 0.0, 0.0); 
         else
-            glColor3f(0.0, 0.0, 1.0); 
+            glColor3f(0.0, 0.3, 1.0); 
         for (unsigned i = 0; i < 360; ++i) {
             double degInRad = i * M_PI / 180.0;
             glVertex2f(position.x + cos(degInRad)*radius, position.y + sin(degInRad)*radius);
@@ -143,30 +170,8 @@ public:
     std::vector<PhysicsBody> bodies;
 };
 
-// Globals and Constants
-// ----------------------------------------------------------------------------
-static int window_width = 900;
-static int window_height = 600;
 
-enum MODE {
-    MODE_DEFAULT,
-    MODE_ADD_OBJECTS,
-    MODE_CHANGE_VELOCITY,
-    MODE_MOVE
-};
-static int mode = MODE_DEFAULT;
-
-static int mask = 1;
-
-enum MOUSE_STATE {
-    MOUSE_DEFAULT,
-    MOUSE_DRAWING
-};
-static int mouse_state = MOUSE_DEFAULT;
-
-// Index of cricle currently being modified
-static int reshape_index = -1;
-
+// Global physics world
 PhysicsWorld world;
 
 
@@ -220,41 +225,40 @@ void update_bodies()
 
     // Check for ball collisions
     bool collisions = true;
-    while (collisions) {
-        collisions = false;
-        for (size_t i = 0; i < world.bodies.size() - 1; ++i) {
-            for (size_t j = i + 1; j < world.bodies.size(); ++j) {
-                // Friendly fire
-                if (world.bodies[i].mask & world.bodies[j].mask) {
-                    continue;
-                }
-                // TODO different collision mechanisms
-                double d = fabs(distance(world.bodies[i].position, world.bodies[j].position));
-                double rad_sum = world.bodies[i].radius + world.bodies[j].radius;
-                if (d < rad_sum) {
-                    collisions = true;
-                    Vector v1 = world.bodies[i].velocity;
-                    Vector v2 = world.bodies[j].velocity;
-                    double m1 = world.bodies[i].mass;
-                    double m2 = world.bodies[j].mass;
-                    Point p1 = world.bodies[i].position;
-                    Point p2 = world.bodies[j].position;
+    // while (collisions) {
+    collisions = false;
+    for (size_t i = 0; i < world.bodies.size() - 1; ++i) {
+        for (size_t j = i + 1; j < world.bodies.size(); ++j) {
+            // Friendly fire
+            if (friendly_fire && (world.bodies[i].mask & world.bodies[j].mask)) {
+                continue;
+            }
+            // TODO different collision mechanisms
+            double d = fabs(distance(world.bodies[i].position, world.bodies[j].position));
+            double rad_sum = world.bodies[i].radius + world.bodies[j].radius;
+            if (d < rad_sum) {
+                collisions = true;
+                Vector v1 = world.bodies[i].velocity;
+                Vector v2 = world.bodies[j].velocity;
+                double m1 = world.bodies[i].mass;
+                double m2 = world.bodies[j].mass;
+                Point p1 = world.bodies[i].position;
+                Point p2 = world.bodies[j].position;
 
-                    Vector v1p = v1 - ((2*m2) / (m1+m2)) * ((v1-v2).dot_product(p1-p2) / pow((p1-p2).length(), 2)) * (p1-p2);
-                    Vector v2p = v2 - ((2*m1) / (m1+m2)) * ((v2-v1).dot_product(p2-p1) / pow((p2-p1).length(), 2)) * (p2-p1);
+                Vector v1p = v1 - ((2*m2) / (m1+m2)) * ((v1-v2).dot_product(p1-p2) / pow((p1-p2).length(), 2)) * (p1-p2);
+                Vector v2p = v2 - ((2*m1) / (m1+m2)) * ((v2-v1).dot_product(p2-p1) / pow((p2-p1).length(), 2)) * (p2-p1);
 
-                    world.bodies[i].velocity = v1p;
-                    world.bodies[j].velocity = v2p;
+                world.bodies[i].velocity = v1p;
+                world.bodies[j].velocity = v2p;
 
-                    did_collide[i] = true;
-                    did_collide[j] = true;
-                }
+                did_collide[i] = true;
+                did_collide[j] = true;
             }
         }
-        for (size_t i = 0; i < world.bodies.size(); ++i) {
-            if (did_collide[i])
-                world.bodies[i].position += world.bodies[i].velocity;
-        }
+    }
+    for (size_t i = 0; i < world.bodies.size(); ++i) {
+        if (did_collide[i])
+            world.bodies[i].position += world.bodies[i].velocity;
     }
 }
 
@@ -338,6 +342,9 @@ void handleKey(unsigned char key, int x, int y)
     if (key == ' ') {
         mode = (mode != MODE_MOVE) ? MODE_MOVE : MODE_DEFAULT;
     }
+    else if (key == 'f' || key == 'F') {
+        friendly_fire = !friendly_fire;
+    }
     glutPostRedisplay();
 }
 void specialKey(int key, int x, int y)
@@ -367,6 +374,10 @@ void menu(int value)
 {
     if (value == 1)
         mode = MODE_CHANGE_VELOCITY;
+    else if (value == 2)
+        friendly_fire = !friendly_fire;
+    else if (value == 3)
+        world.bodies.clear();
     glutPostRedisplay();
 }
 
@@ -380,6 +391,8 @@ void make_menu(void)
     glutCreateMenu(menu);
     glutAddSubMenu("Add Bodies", mode_menu);
     glutAddMenuEntry("Change Velocity", 1);
+    glutAddMenuEntry("Toggle Friendly Fire", 2);
+    glutAddMenuEntry("Reset World", 3);
 
     glutAttachMenu(GLUT_MIDDLE_BUTTON);
 }
