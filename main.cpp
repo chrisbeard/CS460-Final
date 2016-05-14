@@ -112,8 +112,8 @@ public:
     double mass;
     double radius;
 
-    PhysicsBody() : position(), velocity(), mass(0), radius(0) {}
-    PhysicsBody(double xIn, double yIn) : position(xIn, yIn), velocity(), mass(0), radius(0) {}
+    PhysicsBody() : position(), velocity(), mass(1), radius(0) {}
+    PhysicsBody(double xIn, double yIn) : position(xIn, yIn), velocity(), mass(1), radius(0) {}
 
     void drawCircle() {
         glLineWidth(2.0);
@@ -128,7 +128,7 @@ public:
         glLineWidth(2.0);
         glBegin(GL_LINES);
         glVertex2f(position.x, position.y);
-        glVertex2f(position.x + velocity.x, position.y + velocity.y);
+        glVertex2f(position.x + 30.0 * velocity.x, position.y + 30.0 * velocity.y);
         glEnd();
     }
 };
@@ -182,7 +182,7 @@ void update_bodies()
     // Check for wall collsions
     for (size_t i = 0; i < world.bodies.size(); ++i) {
         Point old_position = world.bodies[i].position;
-        Vector velocity = world.bodies[i].velocity / 30.0;
+        Vector velocity = world.bodies[i].velocity;
         Point new_position = world.bodies[i].position + velocity;
         double radius = world.bodies[i].radius;
 
@@ -209,20 +209,40 @@ void update_bodies()
         world.bodies[i].position = new_position;
     }
 
+    std::vector<bool> did_collide(world.bodies.size(), false);
+
     // Check for ball collisions
-    for (size_t i = 0; i < world.bodies.size() - 1; ++i) {
-        for (size_t j = i + 1; j < world.bodies.size(); ++j) {
-            // TODO different collision mechanisms
-            double d = fabs(distance(world.bodies[i].position, world.bodies[j].position));
-            double rad_sum = world.bodies[i].radius + world.bodies[j].radius;
-            if (d < rad_sum) {
-                Vector v1 = world.bodies[i].velocity;
-                Vector v2 = world.bodies[j].velocity;
-                
-                // TODO take mass into account
-                world.bodies[i].velocity = v2;
-                world.bodies[j].velocity = v1;
+    bool collisions = true;
+    while (collisions) {
+        collisions = false;
+        for (size_t i = 0; i < world.bodies.size() - 1; ++i) {
+            for (size_t j = i + 1; j < world.bodies.size(); ++j) {
+                // TODO different collision mechanisms
+                double d = fabs(distance(world.bodies[i].position, world.bodies[j].position));
+                double rad_sum = world.bodies[i].radius + world.bodies[j].radius;
+                if (d < rad_sum) {
+                    collisions = true;
+                    Vector v1 = world.bodies[i].velocity;
+                    Vector v2 = world.bodies[j].velocity;
+                    double m1 = world.bodies[i].mass;
+                    double m2 = world.bodies[j].mass;
+                    Point p1 = world.bodies[i].position;
+                    Point p2 = world.bodies[j].position;
+
+                    Vector v1p = v1 - ((2*m2) / (m1+m2)) * ((v1-v2).dot_product(p1-p2) / pow((p1-p2).length(), 2)) * (p1-p2);
+                    Vector v2p = v2 - ((2*m1) / (m1+m2)) * ((v2-v1).dot_product(p2-p1) / pow((p2-p1).length(), 2)) * (p2-p1);
+
+                    world.bodies[i].velocity = v1p;
+                    world.bodies[j].velocity = v2p;
+
+                    did_collide[i] = true;
+                    did_collide[j] = true;
+                }
             }
+        }
+        for (size_t i = 0; i < world.bodies.size(); ++i) {
+            if (did_collide[i])
+                world.bodies[i].position += world.bodies[i].velocity;
         }
     }
 }
@@ -268,6 +288,7 @@ void mouse(int button, int state, int x, int y)
             }
         } else if (state == GLUT_DOWN && mouse_state == MOUSE_DRAWING) {
             world.bodies[reshape_index].radius = distance(world.bodies[reshape_index].position, p);
+            world.bodies[reshape_index].mass = pow(world.bodies[reshape_index].radius / 10, 2);
             reshape_index = -1;
             mouse_state = MOUSE_DEFAULT;
         }
@@ -279,7 +300,7 @@ void mouse(int button, int state, int x, int y)
                 mouse_state = MOUSE_DRAWING;
             }
         } else if (state == GLUT_DOWN && mouse_state == MOUSE_DRAWING) {
-            world.bodies[reshape_index].velocity = p - world.bodies[reshape_index].position;
+            world.bodies[reshape_index].velocity = (p - world.bodies[reshape_index].position) / 30.0;
             mouse_state = MOUSE_DEFAULT;
         }
     }
@@ -294,7 +315,7 @@ void mouseMove(int x, int y)
             world.bodies[reshape_index].radius = distance(world.bodies[reshape_index].position, p);
         }
         else if (mode == MODE_CHANGE_VELOCITY && mouse_state == MOUSE_DRAWING) {
-            world.bodies[reshape_index].velocity = p - world.bodies[reshape_index].position;
+            world.bodies[reshape_index].velocity = (p - world.bodies[reshape_index].position) / 30.0;
         }
     }
     glutPostRedisplay();
