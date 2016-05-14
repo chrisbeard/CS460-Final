@@ -111,13 +111,18 @@ public:
     Vector velocity;
     double mass;
     double radius;
+    int mask;
 
-    PhysicsBody() : position(), velocity(), mass(1), radius(0) {}
-    PhysicsBody(double xIn, double yIn) : position(xIn, yIn), velocity(), mass(1), radius(0) {}
+    PhysicsBody() : position(), velocity(), mass(1), radius(0), mask(1) {}
+    PhysicsBody(double xIn, double yIn, int maskIn) : position(xIn, yIn), velocity(), mass(1), radius(0), mask(maskIn) {}
 
     void drawCircle() {
         glLineWidth(2.0);
         glBegin(GL_LINE_LOOP);
+        if (mask == 1)
+            glColor3f(1.0, 0.0, 0.0); 
+        else
+            glColor3f(0.0, 0.0, 1.0); 
         for (unsigned i = 0; i < 360; ++i) {
             double degInRad = i * M_PI / 180.0;
             glVertex2f(position.x + cos(degInRad)*radius, position.y + sin(degInRad)*radius);
@@ -150,6 +155,8 @@ enum MODE {
     MODE_MOVE
 };
 static int mode = MODE_DEFAULT;
+
+static int mask = 1;
 
 enum MOUSE_STATE {
     MOUSE_DEFAULT,
@@ -217,6 +224,10 @@ void update_bodies()
         collisions = false;
         for (size_t i = 0; i < world.bodies.size() - 1; ++i) {
             for (size_t j = i + 1; j < world.bodies.size(); ++j) {
+                // Friendly fire
+                if (world.bodies[i].mask & world.bodies[j].mask) {
+                    continue;
+                }
                 // TODO different collision mechanisms
                 double d = fabs(distance(world.bodies[i].position, world.bodies[j].position));
                 double rad_sum = world.bodies[i].radius + world.bodies[j].radius;
@@ -280,7 +291,7 @@ void mouse(int button, int state, int x, int y)
     if (mode == MODE_ADD_OBJECTS && button == GLUT_LEFT_BUTTON) {
         if (state == GLUT_DOWN && mouse_state == MOUSE_DEFAULT) {
             if ((reshape_index = get_circle_for_point(p)) == -1) {
-                world.bodies.push_back(PhysicsBody(x, y));
+                world.bodies.push_back(PhysicsBody(x, y, mask));
                 reshape_index = world.bodies.size() - 1;
                 mouse_state = MOUSE_DRAWING;
             } else {
@@ -348,28 +359,27 @@ void specialKey(int key, int x, int y)
 
 void mode_sub(int value)
 {
-    if (value == 0)
-        mode = MODE_ADD_OBJECTS;
-    else if (value == 1)
-        mode = MODE_CHANGE_VELOCITY;
+    mode = MODE_ADD_OBJECTS;
+    mask = value;
     glutPostRedisplay();
 }
 void menu(int value)
 {
-    if (value == 0)
-        (void)value;
+    if (value == 1)
+        mode = MODE_CHANGE_VELOCITY;
     glutPostRedisplay();
 }
 
 void make_menu(void)
 { 
     int mode_menu = glutCreateMenu(mode_sub);
-    glutAddMenuEntry("Add Bodies", 0);
-    glutAddMenuEntry("Change Velocity", 1);
+    glutAddMenuEntry("Red", 1);
+    glutAddMenuEntry("Blue", 2);
 
     /*MainMenu*/
     glutCreateMenu(menu);
-    glutAddSubMenu("Choose Mode", mode_menu);
+    glutAddSubMenu("Add Bodies", mode_menu);
+    glutAddMenuEntry("Change Velocity", 1);
 
     glutAttachMenu(GLUT_MIDDLE_BUTTON);
 }
