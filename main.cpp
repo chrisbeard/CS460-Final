@@ -17,7 +17,7 @@ enum MODE {
     MODE_CHANGE_VELOCITY,
     MODE_MOVE
 };
-static int mode = MODE_DEFAULT;
+static int mode = MODE_ADD_OBJECTS;
 
 static bool friendly_fire = false;
 static int mask = 1;
@@ -56,10 +56,6 @@ public:
     void print() {
         std::cout << "vec (" << x << ", " << y << ")\n";
     }
-    void add(const Vector &v) {
-        x += v.x;
-        y += v.y;
-    }
 };
 class Point {
 public:
@@ -87,9 +83,7 @@ public:
         return *this;
     }
     Point operator +(const Vector &v) {
-        x += v.x;
-        y += v.y;
-        return *this;
+        return Point(x + v.x, y + v.y);
     }
 };
 // Point operators
@@ -100,7 +94,7 @@ Point operator*(double d, Point p) {
     return Point(p.x * d, p.y * d);
 }
 double distance(const Point &p1, const Point &p2) {
-    return sqrt(pow(p1.x - p2.x, 2) + pow(p1.y - p2.y, 2));
+    return hypot(p2.x - p1.x, p2.y - p1.y);
 }
 
 // Vector operators
@@ -163,6 +157,9 @@ public:
         glVertex2f(position.x + 30.0 * velocity.x, position.y + 30.0 * velocity.y);
         glEnd();
     }
+    void print() {
+        printf("x: %g, y: %g  dx: %g, dy: %g,  rad: %f,  mass: %g\n", position.x, position.y, velocity.x, velocity.y, radius, mass);
+    }
 };
 
 class PhysicsWorld {
@@ -184,6 +181,38 @@ int get_circle_for_point(const Point &p)
     return -1;
 }
 
+static bool collide(const Point &p1, double r1, const Point &p2, double r2)
+{
+    return distance(p1, p2) - (r1 + r2) < 0.5;
+}
+// Binary search to find the mtd
+double bs_mtd(size_t i, size_t j)
+{
+    Point p1 = world.bodies[i].position;
+    Point p2 = world.bodies[j].position;
+    Vector v = world.bodies[i].velocity;
+    double r1 = world.bodies[i].radius;
+    double r2 = world.bodies[j].radius;
+
+    double factor = 0.5;
+    double diff = factor / 2;
+
+    while (diff > 0.01) {
+        if (collide(p1 + factor * v, r1, p2, r2))
+            factor -= diff;
+        else
+            factor += diff;
+        diff /= 2.0;
+    }
+
+    // If we can't move close enough, signal to move in direction
+    // of the new velocity, post-collision
+    if (collide(p1 + factor * v, r1, p2, r2))
+        return factor - 1;
+
+    return factor;
+}
+
 // Display functions
 // ----------------------------------------------------------------------------
 void update_bodies()
@@ -191,74 +220,85 @@ void update_bodies()
     if (mode != MODE_MOVE)
         return;
 
-    // Check for wall collsions
+    // Check for ball collision
     for (size_t i = 0; i < world.bodies.size(); ++i) {
-        Point old_position = world.bodies[i].position;
-        Vector velocity = world.bodies[i].velocity;
-        Point new_position = world.bodies[i].position + velocity;
-        double radius = world.bodies[i].radius;
 
-        // Left wall
-        if (new_position.x - radius < 0) {
-            new_position.x += 1 * -(new_position.x - radius);
-            world.bodies[i].velocity.x *= -1;
-        }
-        // Right wall
-        if (new_position.x + radius > window_width) {
-            new_position.x -= 1 * (new_position.x + radius - window_width);
-            world.bodies[i].velocity.x *= -1;
-        }
-        // Top wall
-        if (new_position.y - radius < 0) {
-            new_position.y += 2 * -(new_position.y - radius);
-            world.bodies[i].velocity.y *= -1;
-        }
-        // Bottom wall
-        if (new_position.y + radius > window_height) {
-            new_position.y -= 2 * (new_position.y + radius - window_height);
-            world.bodies[i].velocity.y *= -1;
-        }
-        world.bodies[i].position = new_position;
-    }
+        Point new_position = world.bodies[i].position + world.bodies[i].velocity;
+        bool collision = false;
+        double mtd = 1;
+        int index = -1;
+        Vector v1p, v2p;
 
-    std::vector<bool> did_collide(world.bodies.size(), false);
+        for (size_t j = 0; j < world.bodies.size(); ++j) {
+            if (i == j)  continue;
 
-    // Check for ball collisions
-    bool collisions = true;
-    // while (collisions) {
-    collisions = false;
-    for (size_t i = 0; i < world.bodies.size() - 1; ++i) {
-        for (size_t j = i + 1; j < world.bodies.size(); ++j) {
             // Friendly fire
             if (friendly_fire && (world.bodies[i].mask & world.bodies[j].mask)) {
                 continue;
             }
-            // TODO different collision mechanisms
-            double d = fabs(distance(world.bodies[i].position, world.bodies[j].position));
+            double d = distance(new_position, world.bodies[j].position);
             double rad_sum = world.bodies[i].radius + world.bodies[j].radius;
-            if (d < rad_sum) {
-                collisions = true;
-                Vector v1 = world.bodies[i].velocity;
-                Vector v2 = world.bodies[j].velocity;
-                double m1 = world.bodies[i].mass;
-                double m2 = world.bodies[j].mass;
-                Point p1 = world.bodies[i].position;
-                Point p2 = world.bodies[j].position;
+            if (d - rad_sum < 0.5) {
+                collision = true;
 
-                Vector v1p = v1 - ((2*m2) / (m1+m2)) * ((v1-v2).dot_product(p1-p2) / pow((p1-p2).length(), 2)) * (p1-p2);
-                Vector v2p = v2 - ((2*m1) / (m1+m2)) * ((v2-v1).dot_product(p2-p1) / pow((p2-p1).length(), 2)) * (p2-p1);
+                double mtd_temp = bs_mtd(i, j);
+                printf("mtd: %g  i:%zu j:%zu\n", mtd_temp, i, j);
 
-                world.bodies[i].velocity = v1p;
-                world.bodies[j].velocity = v2p;
+                if (mtd_temp < mtd) {
+                    mtd = mtd_temp;
+                    index = j;
 
-                did_collide[i] = true;
-                did_collide[j] = true;
+                    Vector v1 = world.bodies[i].velocity;
+                    Vector v2 = world.bodies[j].velocity;
+                    double m1 = world.bodies[i].mass;
+                    double m2 = world.bodies[j].mass;
+                    Point p1 = world.bodies[i].position;
+                    Point p2 = world.bodies[j].position;
+
+                    v1p = v1 - ((2*m2) / (m1+m2)) * ((v1-v2).dot_product(p1-p2) / pow((p1-p2).length(), 2)) * (p1-p2);
+                    v2p = v2 - ((2*m1) / (m1+m2)) * ((v2-v1).dot_product(p2-p1) / pow((p2-p1).length(), 2)) * (p2-p1);
+                }
             }
         }
-    }
-    for (size_t i = 0; i < world.bodies.size(); ++i) {
-        if (did_collide[i])
-            world.bodies[i].position += world.bodies[i].velocity;
+        // If no collision, check wall collision
+        if (collision) {
+            // We can move close to the other ball
+            if (mtd > 0)
+                world.bodies[i].position += mtd * world.bodies[i].velocity;
+
+            world.bodies[i].velocity = v1p;
+            world.bodies[index].velocity = v2p;
+
+            // Can't move close, move in our new direction
+            if (mtd < 0)
+                world.bodies[i].position += fabs(mtd) * world.bodies[i].velocity;
+        } else {
+            Vector velocity = world.bodies[i].velocity;
+            Point new_position = world.bodies[i].position + velocity;
+            double radius = world.bodies[i].radius;
+
+            // Left wall
+            if (new_position.x - radius < 0) {
+                new_position.x += 1 * -(new_position.x - radius);
+                world.bodies[i].velocity.x *= -1;
+            }
+            // Right wall
+            if (new_position.x + radius > window_width) {
+                new_position.x -= 1 * (new_position.x + radius - window_width);
+                world.bodies[i].velocity.x *= -1;
+            }
+            // Top wall
+            if (new_position.y - radius < 0) {
+                new_position.y += 1 * -(new_position.y - radius);
+                world.bodies[i].velocity.y *= -1;
+            }
+            // Bottom wall
+            if (new_position.y + radius > window_height) {
+                new_position.y -= 1 * (new_position.y + radius - window_height);
+                world.bodies[i].velocity.y *= -1;
+            }
+            world.bodies[i].position = new_position;
+        }
     }
 }
 
