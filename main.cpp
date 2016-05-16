@@ -20,6 +20,12 @@ enum MODE {
 };
 static int mode = MODE_ADD_OBJECTS;
 
+enum DRAW_MODE {
+    DRAW_LINE,
+    DRAW_POLYGON
+};
+static int draw_style = DRAW_LINE;
+
 static bool friendly_fire = false;
 static int mask = 1;
 
@@ -138,7 +144,10 @@ public:
 
     void drawCircle() {
         glLineWidth(2.0);
-        glBegin(GL_LINE_LOOP);
+        if (draw_style == DRAW_LINE)
+            glBegin(GL_LINE_LOOP);
+        else if (draw_style == DRAW_POLYGON)
+            glBegin(GL_POLYGON);
         if (!friendly_fire)
             glColor3f(1.0, 1.0, 1.0); 
         else if (mask == 1)
@@ -417,6 +426,11 @@ void mode_sub(int value)
     mask = value;
     glutPostRedisplay();
 }
+void draw_sub(int value)
+{
+    draw_style = value;
+    glutPostRedisplay();
+}
 void menu(int value)
 {
     if (value == 1)
@@ -436,6 +450,10 @@ void make_menu(void)
     glutAddMenuEntry("Red", 1);
     glutAddMenuEntry("Blue", 2);
 
+    int draw_menu = glutCreateMenu(draw_sub);
+    glutAddMenuEntry("Line", DRAW_LINE);
+    glutAddMenuEntry("Polygon", DRAW_POLYGON);
+
     /*MainMenu*/
     glutCreateMenu(menu);
     glutAddSubMenu("Add Bodies", mode_menu);
@@ -443,6 +461,7 @@ void make_menu(void)
     glutAddMenuEntry("Toggle Friendly Fire", 2);
     glutAddMenuEntry("Reset World", 3);
     glutAddMenuEntry("Remove Body", 4);
+    glutAddSubMenu("Draw Style", draw_menu);
 
     glutAttachMenu(GLUT_MIDDLE_BUTTON);
 }
