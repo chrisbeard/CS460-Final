@@ -15,7 +15,8 @@ enum MODE {
     MODE_DEFAULT,
     MODE_ADD_OBJECTS,
     MODE_CHANGE_VELOCITY,
-    MODE_MOVE
+    MODE_MOVE,
+    MODE_DELETE
 };
 static int mode = MODE_ADD_OBJECTS;
 
@@ -359,6 +360,12 @@ void mouse(int button, int state, int x, int y)
             mouse_state = MOUSE_DEFAULT;
         }
     }
+    // Remove objects
+    else if (mode == MODE_DELETE && button == GLUT_LEFT_BUTTON && state == GLUT_DOWN) {
+        if ((reshape_index = get_circle_for_point(p)) != -1) {
+            world.bodies.erase(world.bodies.begin() + reshape_index);
+        }
+    }
     
     glutPostRedisplay();
 }
@@ -418,6 +425,8 @@ void menu(int value)
         friendly_fire = !friendly_fire;
     else if (value == 3)
         world.bodies.clear();
+    else if  (value == 4)
+        mode = MODE_DELETE;
     glutPostRedisplay();
 }
 
@@ -433,6 +442,7 @@ void make_menu(void)
     glutAddMenuEntry("Change Velocity", 1);
     glutAddMenuEntry("Toggle Friendly Fire", 2);
     glutAddMenuEntry("Reset World", 3);
+    glutAddMenuEntry("Remove Body", 4);
 
     glutAttachMenu(GLUT_MIDDLE_BUTTON);
 }
